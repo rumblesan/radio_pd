@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+libpd-rs = "0.1.10"
+cpal = "0.15"
