@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use shout;
 use toml;
 
 #[derive(Deserialize)]
@@ -34,6 +35,44 @@ fn audio_samplerate_default() -> i32 {
 }
 
 #[derive(Deserialize)]
+pub enum ShoutProtocol {
+    HTTP,
+    XAudioCast,
+    Icy,
+    RoarAudio,
+}
+
+impl From<ShoutProtocol> for shout::ShoutProtocol {
+    fn from(protocol: ShoutProtocol) -> Self {
+        match protocol {
+            ShoutProtocol::HTTP => shout::ShoutProtocol::HTTP,
+            ShoutProtocol::XAudioCast => shout::ShoutProtocol::XAudioCast,
+            ShoutProtocol::Icy => shout::ShoutProtocol::Icy,
+            ShoutProtocol::RoarAudio => shout::ShoutProtocol::RoarAudio,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub enum ShoutFormat {
+    Ogg,
+    MP3,
+    Webm,
+    WebmAudio,
+}
+
+impl From<ShoutFormat> for shout::ShoutFormat {
+    fn from(format: ShoutFormat) -> Self {
+        match format {
+            ShoutFormat::Ogg => shout::ShoutFormat::Ogg,
+            ShoutFormat::MP3 => shout::ShoutFormat::MP3,
+            ShoutFormat::Webm => shout::ShoutFormat::Webm,
+            ShoutFormat::WebmAudio => shout::ShoutFormat::WebmAudio,
+        }
+    }
+}
+
+#[derive(Deserialize)]
 pub struct ShoutConfig {
     pub host: String,
     #[serde(default = "shout_port_default")]
@@ -41,10 +80,20 @@ pub struct ShoutConfig {
     pub user: String,
     pub password: String,
     pub mount: String,
+    #[serde(default = "shout_protocol_default")]
+    pub protocol: ShoutProtocol,
+    #[serde(default = "shout_format_default")]
+    pub format: ShoutFormat,
 }
 
 fn shout_port_default() -> u16 {
     8000
+}
+fn shout_protocol_default() -> ShoutProtocol {
+    ShoutProtocol::HTTP
+}
+fn shout_format_default() -> ShoutFormat {
+    ShoutFormat::Ogg
 }
 pub fn read(path: PathBuf) -> Result<Config, Box<dyn error::Error>> {
     let data = fs::read_to_string(path).expect("Unable to read file");

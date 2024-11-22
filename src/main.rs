@@ -54,14 +54,19 @@ fn main() {
 
     pd.open_patch(cwd.join(config.pd.patch)).unwrap();
 
+    if !matches!(config.shout.format, config::ShoutFormat::Ogg) {
+        println!("Only support OGG format for shoutcast currently");
+        return;
+    }
+
     let conn = shout::ShoutConnBuilder::new()
         .host(config.shout.host)
         .port(config.shout.port)
         .user(config.shout.user)
         .password(config.shout.password)
         .mount(config.shout.mount)
-        .protocol(shout::ShoutProtocol::HTTP)
-        .format(shout::ShoutFormat::Ogg)
+        .protocol(config.shout.protocol.into())
+        .format(config.shout.format.into())
         .build()
         .unwrap();
 
@@ -73,7 +78,6 @@ fn main() {
         .build()
         .unwrap();
 
-    // Turn audio processing on
     pd.activate_audio(true).unwrap();
 
     const BLOCK_SIZE: usize = 4096;
