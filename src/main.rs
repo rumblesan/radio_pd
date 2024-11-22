@@ -1,10 +1,14 @@
-use std::io::{Write, Result, Error};
-use std::num::{NonZeroU8, NonZeroU32};
+mod config;
+
+use std::env;
+use std::io;
+use std::io::{Error, Write};
+use std::num::{NonZeroU32, NonZeroU8};
 use std::path::PathBuf;
 
 use clap::Parser;
 
-use libpd_rs::convenience::{PdGlobal, calculate_ticks};
+use libpd_rs::convenience::{calculate_ticks, PdGlobal};
 use shout::ShoutConn;
 use vorbis_rs::VorbisEncoderBuilder;
 
@@ -12,23 +16,23 @@ use vorbis_rs::VorbisEncoderBuilder;
 #[command(version, about, long_about = None)]
 struct CliArgs {
     #[arg(short, long, value_name = "FILE")]
-    patch: PathBuf,
+    config: PathBuf,
 }
 
 struct ShoutConnWriter(ShoutConn);
 
 impl Write for ShoutConnWriter {
-    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.0.send(buf) {
             Ok(..) => {
                 self.0.sync();
                 return Ok(buf.len());
-            },
-            Err(..) => Err(Error::other("Error writing to Shoutcast Connection"))
+            }
+            Err(..) => Err(Error::other("Error writing to Shoutcast Connection")),
         }
     }
 
-    fn flush(&mut self) -> Result<()> {
+    fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
@@ -36,27 +40,38 @@ impl Write for ShoutConnWriter {
 fn main() {
     let cli = CliArgs::parse();
 
-    let sample_rate: NonZeroU32 = NonZeroU32::new(u32::try_from(44100).unwrap()).unwrap();
-    let output_channels: NonZeroU8 = NonZeroU8::new(u8::try_from(2).unwrap()).unwrap();
+    let cwd = env::current_dir().unwrap();
 
-    let mut pd = PdGlobal::init_and_configure(0, 2, 44100).unwrap();
+    let config = config::read(cwd.join(cli.config)).unwrap();
 
-    pd.open_patch(cli.patch).unwrap();
+    let samplerate: NonZeroU32 =
+        NonZeroU32::new(u32::try_from(config.audio.samplerate).unwrap()).unwrap();
+    let output_channels: NonZeroU8 =
+        NonZeroU8::new(u8::try_from(config.audio.channels).unwrap()).unwrap();
+
+    let mut pd =
+        PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate).unwrap();
+
+    pd.open_patch(cwd.join(config.pd.patch)).unwrap();
 
     let conn = shout::ShoutConnBuilder::new()
-        .host(String::from("localhost"))
-        .port(8000)
-        .user(String::from("source"))
-        .password(String::from("hackme"))
-        .mount(String::from("/test.ogg"))
+        .host(config.shout.host)
+        .port(config.shout.port)
+        .user(config.shout.user)
+        .password(config.shout.password)
+        .mount(config.shout.mount)
         .protocol(shout::ShoutProtocol::HTTP)
         .format(shout::ShoutFormat::Ogg)
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     let conn_sink = ShoutConnWriter(conn);
     println!("Connected to server");
 
-    let mut vencoder = VorbisEncoderBuilder::new(sample_rate, output_channels, conn_sink).unwrap().build().unwrap();
+    let mut vencoder = VorbisEncoderBuilder::new(samplerate, output_channels, conn_sink)
+        .unwrap()
+        .build()
+        .unwrap();
 
     // Turn audio processing on
     pd.activate_audio(true).unwrap();
@@ -77,9 +92,7 @@ fn main() {
     }
     //println!("Finished!");
 
-
     //pd.activate_audio(false)?;
 
     //pd.close_patch()?;
-
 }

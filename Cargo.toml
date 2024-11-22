@@ -9,3 +9,5 @@ cpal = "0.15"
 shout = "0.2.1"
 vorbis_rs = "0.5.4"
 clap = { version = "4.5.21", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8.19"

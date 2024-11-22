@@ -1,0 +1,14 @@
+[pd]
+patch = "patches/sine.pd"
+
+[audio]
+samplerate = 44100
+channels = 2
+block_size = 4096
+
+[shout]
+host = "localhost"
+port = 8000
+user = "source"
+password = "hackme"
+mount = "/test.ogg"
