@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 libpd-rs = "0.1.10"
 cpal = "0.15"
+shout = "0.2.1"
+vorbis_rs = "0.5.4"

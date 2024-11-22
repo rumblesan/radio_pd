@@ -1,26 +1,34 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::io::{Write, Result, Error};
+use std::num::{NonZeroU8, NonZeroU32};
+
 use libpd_rs::convenience::{PdGlobal, calculate_ticks};
+use shout::ShoutConn;
+use vorbis_rs::VorbisEncoderBuilder;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+struct ShoutConnWriter(ShoutConn);
 
-    // Initialize cpal
-    // This could have been another cross platform audio library
-    // basically anything which gets you the audio callback of the os.
-    let host = cpal::default_host();
+impl Write for ShoutConnWriter {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        match self.0.send(buf) {
+            Ok(..) => {
+                self.0.sync();
+                return Ok(buf.len());
+            },
+            Err(..) => Err(Error::other("Error writing to Shoutcast Connection"))
+        }
+    }
 
-    // Currently we're only going to output to the default device
-    let device = host.default_output_device().unwrap();
+    fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
 
-    // Using the default config
-    let config = device.default_output_config()?;
+fn main() {
 
-    // Let's get the default configuration from the audio driver.
-    let sample_rate = config.sample_rate().0 as i32;
-    let output_channels = config.channels() as i32;
+    let sample_rate: NonZeroU32 = NonZeroU32::new(u32::try_from(44100).unwrap()).unwrap();
+    let output_channels: NonZeroU8 = NonZeroU8::new(u8::try_from(2).unwrap()).unwrap();
 
-    // Initialize libpd with that configuration,
-    // with no input channels since we're not going to use them.
-    let mut pd = PdGlobal::init_and_configure(0, output_channels, sample_rate)?;
+    let mut pd = PdGlobal::init_and_configure(0, 2, 44100).unwrap();
 
     // Let's evaluate a pd patch.
     // We could have opened a `.pd` file also.
@@ -37,46 +45,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #X connect 2 0 0 0;
     #X connect 3 0 0 1;
         "#,
-    )?;
+    ).unwrap();
 
-    // Build the audio stream.
-    let output_stream = device.build_output_stream(
-        &config.into(),
-        move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-            // Provide the ticks to advance per iteration for the internal scheduler.
-            let ticks = calculate_ticks(output_channels, data.len() as i32);
+    let conn = shout::ShoutConnBuilder::new()
+        .host(String::from("localhost"))
+        .port(8000)
+        .user(String::from("source"))
+        .password(String::from("hackme"))
+        .mount(String::from("/test.ogg"))
+        .protocol(shout::ShoutProtocol::HTTP)
+        .format(shout::ShoutFormat::Ogg)
+        .build().unwrap();
 
-            // Here if we had an input buffer
-            // we could have modified it to do pre-processing.
+    let conn_sink = ShoutConnWriter(conn);
+    println!("Connected to server");
 
-            // Process audio, advance internal scheduler.
-            libpd_rs::process::process_float(ticks, &[], data);
-
-            // Here we could have done post processing
-            // after pd processed our output buffer in place.
-        },
-        |err| eprintln!("an error occurred on stream: {}", err),
-        None,
-    )?;
+    let mut vencoder = VorbisEncoderBuilder::new(sample_rate, output_channels, conn_sink).unwrap().build().unwrap();
 
     // Turn audio processing on
-    pd.activate_audio(true)?;
+    pd.activate_audio(true).unwrap();
 
-    // Run the stream
-    output_stream.play()?;
+    const BLOCK_SIZE: usize = 4096;
+    let mut left_samps: [f32; BLOCK_SIZE] = [0.0; BLOCK_SIZE];
+    let mut right_samps: [f32; BLOCK_SIZE] = [0.0; BLOCK_SIZE];
+    let mut pd_output: [f32; BLOCK_SIZE * 2] = [0.0; BLOCK_SIZE * 2];
+    loop {
+        let ticks = calculate_ticks(2, pd_output.len() as i32);
+        libpd_rs::process::process_float(ticks, &[], &mut pd_output);
+        for i in 0..BLOCK_SIZE {
+            left_samps[i] = pd_output[i * 2];
+            right_samps[i] = pd_output[(i * 2) + 1];
+        }
+        let buffer: [&[f32; BLOCK_SIZE]; 2] = [&left_samps, &right_samps];
+        vencoder.encode_audio_block(buffer).unwrap();
+    }
+    //println!("Finished!");
 
-    // Wait a bit for listening..
-    std::thread::sleep(std::time::Duration::from_secs(5));
 
-    // Turn audio processing off
-    pd.activate_audio(false)?;
+    //pd.activate_audio(false)?;
 
-    // Pause the stream
-    output_stream.pause()?;
+    //pd.close_patch()?;
 
-    // Close the patch
-    pd.close_patch()?;
-
-    // Leave
-    Ok(())
 }
