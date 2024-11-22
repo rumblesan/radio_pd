@@ -1,9 +1,19 @@
 use std::io::{Write, Result, Error};
 use std::num::{NonZeroU8, NonZeroU32};
+use std::path::PathBuf;
+
+use clap::Parser;
 
 use libpd_rs::convenience::{PdGlobal, calculate_ticks};
 use shout::ShoutConn;
 use vorbis_rs::VorbisEncoderBuilder;
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct CliArgs {
+    #[arg(short, long, value_name = "FILE")]
+    patch: PathBuf,
+}
 
 struct ShoutConnWriter(ShoutConn);
 
@@ -24,28 +34,14 @@ impl Write for ShoutConnWriter {
 }
 
 fn main() {
+    let cli = CliArgs::parse();
 
     let sample_rate: NonZeroU32 = NonZeroU32::new(u32::try_from(44100).unwrap()).unwrap();
     let output_channels: NonZeroU8 = NonZeroU8::new(u8::try_from(2).unwrap()).unwrap();
 
     let mut pd = PdGlobal::init_and_configure(0, 2, 44100).unwrap();
 
-    // Let's evaluate a pd patch.
-    // We could have opened a `.pd` file also.
-    // This patch would play a sine wave at 440hz.
-    pd.eval_patch(
-        r#"
-    #N canvas 577 549 158 168 12;
-    #X obj 23 116 dac~;
-    #X obj 23 17 osc~ 440;
-    #X obj 23 66 *~ 0.1;
-    #X obj 81 67 *~ 0.1;
-    #X connect 1 0 2 0;
-    #X connect 1 0 3 0;
-    #X connect 2 0 0 0;
-    #X connect 3 0 0 1;
-        "#,
-    ).unwrap();
+    pd.open_patch(cli.patch).unwrap();
 
     let conn = shout::ShoutConnBuilder::new()
         .host(String::from("localhost"))
