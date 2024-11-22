@@ -1,6 +1,9 @@
 mod config;
+mod pdradio_error;
+use crate::pdradio_error::PDRadioError;
 
 use std::env;
+use std::error;
 use std::io;
 use std::io::{Error, Write};
 use std::num::{NonZeroU32, NonZeroU8};
@@ -37,26 +40,19 @@ impl Write for ShoutConnWriter {
     }
 }
 
-fn main() {
-    let cli = CliArgs::parse();
+fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
+    let cwd = env::current_dir()?;
 
-    let cwd = env::current_dir().unwrap();
+    let config = config::read(cwd.join(cli.config))?;
 
-    let config = config::read(cwd.join(cli.config)).unwrap();
+    let mut pd = PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate)?;
 
-    let samplerate: NonZeroU32 =
-        NonZeroU32::new(u32::try_from(config.audio.samplerate).unwrap()).unwrap();
-    let output_channels: NonZeroU8 =
-        NonZeroU8::new(u8::try_from(config.audio.channels).unwrap()).unwrap();
-
-    let mut pd =
-        PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate).unwrap();
-
-    pd.open_patch(cwd.join(config.pd.patch)).unwrap();
+    pd.open_patch(cwd.join(config.pd.patch))?;
 
     if !matches!(config.shout.format, config::ShoutFormat::Ogg) {
-        println!("Only support OGG format for shoutcast currently");
-        return;
+        return Err(Box::new(PDRadioError(
+            "Only support OGG format for shoutcast currently".into(),
+        )));
     }
 
     let conn = shout::ShoutConnBuilder::new()
@@ -68,17 +64,22 @@ fn main() {
         .protocol(config.shout.protocol.into())
         .format(config.shout.format.into())
         .build()
-        .unwrap();
+        .map_err(|e| -> PDRadioError { e.into() })?;
 
     let conn_sink = ShoutConnWriter(conn);
     println!("Connected to server");
 
-    let mut vencoder = VorbisEncoderBuilder::new(samplerate, output_channels, conn_sink)
-        .unwrap()
-        .build()
-        .unwrap();
+    let samplerate: NonZeroU32 = u32::try_from(config.audio.samplerate)
+        .and_then(|v| NonZeroU32::try_from(v))
+        .map_err(|err| PDRadioError(format!("Error setting encoder samplerate: {err}").into()))?;
+    let output_channels: NonZeroU8 = u8::try_from(config.audio.channels)
+        .and_then(|v| NonZeroU8::try_from(v))
+        .map_err(|err| PDRadioError(format!("Error setting encoder channels: {err}").into()))?;
 
-    pd.activate_audio(true).unwrap();
+    let mut encoder_builder = VorbisEncoderBuilder::new(samplerate, output_channels, conn_sink)?;
+    let mut vencoder = encoder_builder.build()?;
+
+    pd.activate_audio(true)?;
 
     const BLOCK_SIZE: usize = 4096;
     let mut left_samps: [f32; BLOCK_SIZE] = [0.0; BLOCK_SIZE];
@@ -92,11 +93,18 @@ fn main() {
             right_samps[i] = pd_output[(i * 2) + 1];
         }
         let buffer: [&[f32; BLOCK_SIZE]; 2] = [&left_samps, &right_samps];
-        vencoder.encode_audio_block(buffer).unwrap();
+        vencoder.encode_audio_block(buffer)?;
     }
-    //println!("Finished!");
+    ////println!("Finished!");
 
-    //pd.activate_audio(false)?;
+    ////pd.activate_audio(false)?;
 
-    //pd.close_patch()?;
+    ////pd.close_patch()?;
+}
+
+fn main() {
+    let args = CliArgs::parse();
+    if let Err(e) = run(args) {
+        println!("{}", e); // "There is an error: Oops"
+    }
 }
