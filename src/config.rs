@@ -11,6 +11,7 @@ pub struct Config {
     pub pd: PDConfig,
     pub audio: AudioConfig,
     pub shout: ShoutConfig,
+    pub metadata: MetadataConfig,
 }
 
 #[derive(Deserialize)]
@@ -89,12 +90,45 @@ pub struct ShoutConfig {
 fn shout_port_default() -> u16 {
     8000
 }
+
 fn shout_protocol_default() -> ShoutProtocol {
     ShoutProtocol::HTTP
 }
+
 fn shout_format_default() -> ShoutFormat {
     ShoutFormat::Ogg
 }
+
+#[derive(Deserialize)]
+pub struct MetadataConfig {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub genre: Option<String>,
+    pub url: Option<String>,
+}
+
+impl MetadataConfig {
+    pub fn to_shout_metadata(&self) -> Vec<shout::ShoutMeta> {
+        vec![
+            self.name
+                .as_ref()
+                .map(|name| shout::ShoutMeta::Name(name.to_string())),
+            self.description
+                .as_ref()
+                .map(|description| shout::ShoutMeta::Description(description.to_string())),
+            self.genre
+                .as_ref()
+                .map(|genre| shout::ShoutMeta::Genre(genre.to_string())),
+            self.url
+                .as_ref()
+                .map(|url| shout::ShoutMeta::Url(url.to_string())),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+}
+
 pub fn read(path: PathBuf) -> Result<Config, Box<dyn error::Error>> {
     let data = fs::read_to_string(path).expect("Unable to read file");
     let config: Config = toml::from_str(&data)?;

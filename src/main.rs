@@ -55,14 +55,20 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
         )));
     }
 
-    let conn = shout::ShoutConnBuilder::new()
+    let mut conn_builder = shout::ShoutConnBuilder::new()
         .host(config.shout.host)
         .port(config.shout.port)
         .user(config.shout.user)
         .password(config.shout.password)
         .mount(config.shout.mount)
         .protocol(config.shout.protocol.into())
-        .format(config.shout.format.into())
+        .format(config.shout.format.into());
+
+    for metadata in config.metadata.to_shout_metadata() {
+        conn_builder = conn_builder.add_meta(metadata);
+    }
+
+    let conn = conn_builder
         .build()
         .map_err(|e| -> PDRadioError { e.into() })?;
 

@@ -12,3 +12,9 @@ port = 8000
 user = "source"
 password = "hackme"
 mount = "/test.ogg"
+
+[metadata]
+name        = "PD Radio"
+description = "A PureData radio station"
+genre       = "Ambient Drone"
+url         = "http://rumblesan.com"
