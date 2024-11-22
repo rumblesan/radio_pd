@@ -640,6 +640,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "radio_pd"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "libpd-rs",
+ "shout",
+ "vorbis_rs",
+]
+
+[[package]]
 name = "regex"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,16 +695,6 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rustpd_test"
-version = "0.1.0"
-dependencies = [
- "cpal",
- "libpd-rs",
- "shout",
- "vorbis_rs",
 ]
 
 [[package]]

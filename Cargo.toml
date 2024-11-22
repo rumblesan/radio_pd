@@ -1,5 +1,5 @@
 [package]
-name = "rustpd_test"
+name = "radio_pd"
 version = "0.1.0"
 edition = "2021"
 
