@@ -36,6 +36,7 @@ impl Write for ShoutConnWriter {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.0.sync();
         Ok(())
     }
 }
