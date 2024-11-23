@@ -98,14 +98,24 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
             left_samps[i] = pd_output[i * 2];
             right_samps[i] = pd_output[(i * 2) + 1];
         }
-        let buffer: [&[f32; BLOCK_SIZE]; 2] = [&left_samps, &right_samps];
-        vencoder.encode_audio_block(buffer)?;
+        if vencoder
+            .encode_audio_block([&left_samps, &right_samps])
+            .map_err(|err| {
+                println!("{err}");
+                err
+            })
+            .is_err()
+        {
+            break;
+        }
     }
-    ////println!("Finished!");
+    println!("Finished!");
 
-    ////pd.activate_audio(false)?;
+    pd.activate_audio(false)?;
 
-    ////pd.close_patch()?;
+    pd.close_patch()?;
+
+    Ok(())
 }
 
 fn main() {
