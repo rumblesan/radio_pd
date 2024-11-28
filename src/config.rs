@@ -12,6 +12,7 @@ pub struct Config {
     pub audio: AudioConfig,
     pub shout: ShoutConfig,
     pub metadata: MetadataConfig,
+    pub osc: OSCConfig,
 }
 
 #[derive(Deserialize)]
@@ -97,6 +98,28 @@ fn shout_protocol_default() -> ShoutProtocol {
 
 fn shout_format_default() -> ShoutFormat {
     ShoutFormat::Ogg
+}
+
+#[derive(Deserialize)]
+pub struct OSCConfig {
+    #[serde(default = "osc_listen_default")]
+    pub listen: bool,
+    #[serde(default = "osc_host_default")]
+    pub host: String,
+    #[serde(default = "osc_port_default")]
+    pub port: String,
+}
+
+fn osc_listen_default() -> bool {
+    false
+}
+
+fn osc_host_default() -> String {
+    "0.0.0.0".to_owned()
+}
+
+fn osc_port_default() -> String {
+    "8080".to_owned()
 }
 
 #[derive(Deserialize)]
