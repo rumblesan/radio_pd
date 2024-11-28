@@ -21,3 +21,6 @@ url         = "http://rumblesan.com"
 
 [osc]
 listen = true
+
+[http]
+listen = true

@@ -1,4 +1,5 @@
 mod config;
+mod http;
 mod osc;
 mod pdradio_error;
 use crate::pdradio_error::PDRadioError;
@@ -79,7 +80,7 @@ fn handle_packet(packet: OscPacket) {
 
 fn create_osc_listener(config: config::OSCConfig) -> Option<thread::JoinHandle<()>> {
     if !config.listen {
-        println!("Not listening for OSC messaged");
+        println!("Not listening for OSC messages");
         return None;
     }
 
@@ -122,6 +123,8 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
     let mut pd = PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate)?;
 
     let osc_coms_handler = create_osc_listener(config.osc);
+
+    let http_coms_handler = http::create_http_listener(config.http);
 
     pd.open_patch(cwd.join(config.pd.patch))?;
 
@@ -193,6 +196,7 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
     println!("Finished!");
 
     osc_coms_handler.map(|h| h.join());
+    http_coms_handler.map(|h| h.join());
 
     pd.activate_audio(false)?;
 

@@ -13,6 +13,7 @@ pub struct Config {
     pub shout: ShoutConfig,
     pub metadata: MetadataConfig,
     pub osc: OSCConfig,
+    pub http: HTTPConfig,
 }
 
 #[derive(Deserialize)]
@@ -120,6 +121,28 @@ fn osc_host_default() -> String {
 
 fn osc_port_default() -> String {
     "8080".to_owned()
+}
+
+#[derive(Deserialize)]
+pub struct HTTPConfig {
+    #[serde(default = "http_listen_default")]
+    pub listen: bool,
+    #[serde(default = "http_host_default")]
+    pub host: String,
+    #[serde(default = "http_port_default")]
+    pub port: String,
+}
+
+fn http_listen_default() -> bool {
+    true
+}
+
+fn http_host_default() -> String {
+    "0.0.0.0".to_owned()
+}
+
+fn http_port_default() -> String {
+    "9001".to_owned()
 }
 
 #[derive(Deserialize)]
