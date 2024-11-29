@@ -1,3 +1,4 @@
+mod broadcast;
 mod config;
 mod http;
 mod osc;
@@ -6,8 +7,6 @@ use crate::pdradio_error::PDRadioError;
 
 use std::env;
 use std::error;
-use std::io;
-use std::io::{Error, Write};
 use std::num::{NonZeroU32, NonZeroU8};
 use std::path::PathBuf;
 
@@ -15,7 +14,6 @@ use clap::Parser;
 
 use libpd_rs::convenience::{calculate_ticks, PdGlobal};
 use libpd_rs::receive::{on_print, receive_messages_from_pd};
-use shout::ShoutConn;
 use vorbis_rs::VorbisEncoderBuilder;
 
 #[derive(Parser)]
@@ -23,25 +21,6 @@ use vorbis_rs::VorbisEncoderBuilder;
 struct CliArgs {
     #[arg(short, long, value_name = "FILE")]
     config: PathBuf,
-}
-
-struct ShoutConnWriter(ShoutConn);
-
-impl Write for ShoutConnWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.0.send(buf) {
-            Ok(..) => {
-                self.0.sync();
-                return Ok(buf.len());
-            }
-            Err(..) => Err(Error::other("Error writing to Shoutcast Connection")),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.sync();
-        Ok(())
-    }
 }
 
 fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
@@ -84,7 +63,7 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
         .build()
         .map_err(|e| -> PDRadioError { e.into() })?;
 
-    let conn_sink = ShoutConnWriter(conn);
+    let conn_sink = broadcast::ShoutConnWriter(conn);
     println!("Connected to server");
 
     let samplerate: NonZeroU32 = u32::try_from(config.audio.samplerate)
