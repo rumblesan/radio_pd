@@ -12,8 +12,10 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use libpd_rs::convenience::{calculate_ticks, PdGlobal};
-use libpd_rs::receive::{on_print, receive_messages_from_pd};
+use libpd_rs::{
+    functions::{receive::on_print, util::calculate_ticks},
+    Pd,
+};
 use vorbis_rs::VorbisEncoderBuilder;
 
 #[derive(Parser)]
@@ -34,7 +36,8 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
         )));
     }
 
-    let mut pd = PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate)?;
+    let mut pd = Pd::init_and_configure(0, config.audio.channels, config.audio.samplerate)?;
+    let ctx = pd.audio_context();
 
     let osc_coms_handler = osc::create_osc_listener(config.osc);
 
@@ -83,8 +86,8 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
     let mut pd_output = vec![0.0; config.audio.blocksize * 2];
     loop {
         let ticks = calculate_ticks(2, pd_output.len() as i32);
-        receive_messages_from_pd();
-        libpd_rs::process::process_float(ticks, &[], &mut pd_output);
+        ctx.receive_messages_from_pd();
+        ctx.process_float(ticks, &[], &mut pd_output);
         for i in 0..config.audio.blocksize {
             left_samps[i] = pd_output[i * 2];
             right_samps[i] = pd_output[(i * 2) + 1];

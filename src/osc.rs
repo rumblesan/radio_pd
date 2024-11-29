@@ -6,8 +6,8 @@ use crate::config;
 
 use rosc::{OscPacket, OscType};
 
-use libpd_rs::send::send_list_to;
-use libpd_rs::types::Atom;
+use libpd_rs::functions::send::send_list_to;
+use libpd_rs::Atom;
 
 pub fn osc_type_to_atom(osc_type: OscType) -> Option<Atom> {
     match osc_type {

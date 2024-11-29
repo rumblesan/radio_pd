@@ -7,8 +7,8 @@ use std::thread;
 use rouille::{Request, Response, Server};
 use serde::Deserialize;
 
-use libpd_rs::send::send_list_to;
-use libpd_rs::types::Atom;
+use libpd_rs::functions::send::send_list_to;
+use libpd_rs::Atom;
 
 pub fn create_http_listener(config: config::HTTPConfig) -> Option<thread::JoinHandle<()>> {
     if !config.listen {
