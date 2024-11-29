@@ -10,18 +10,11 @@ use std::io;
 use std::io::{Error, Write};
 use std::num::{NonZeroU32, NonZeroU8};
 use std::path::PathBuf;
-//use std::sync::mpsc::channel;
-use std::str::FromStr;
-use std::thread;
 
 use clap::Parser;
-use rosc::{OscPacket, OscType};
-use std::net::{SocketAddrV4, UdpSocket};
 
 use libpd_rs::convenience::{calculate_ticks, PdGlobal};
 use libpd_rs::receive::{on_print, receive_messages_from_pd};
-use libpd_rs::send::send_list_to;
-use libpd_rs::types::Atom;
 use shout::ShoutConn;
 use vorbis_rs::VorbisEncoderBuilder;
 
@@ -51,70 +44,6 @@ impl Write for ShoutConnWriter {
     }
 }
 
-fn handle_packet(packet: OscPacket) {
-    match packet {
-        OscPacket::Message(msg) => {
-            println!("OSC address: {}", msg.addr);
-            println!("OSC arguments: {:?}", msg.args);
-            let mut pdlist = msg.addr.split("/").map(|s| s.into()).collect::<Vec<Atom>>();
-            pdlist.remove(0);
-            let msgargs: Vec<OscType> = msg.args;
-            let pdargs = msgargs
-                .iter()
-                .map(|el| osc::osc_type_to_atom(el.clone()))
-                .filter(|el| el.is_some())
-                .flatten()
-                .collect::<Vec<Atom>>();
-            pdlist.extend(pdargs);
-            println!("List to send to PD: {:?}", pdlist);
-            match send_list_to("host", &pdlist[..]) {
-                Ok(..) => println!("Sent message to PD: {:?}", pdlist),
-                Err(err) => println!("Error sending message to PD: {}", err),
-            }
-        }
-        OscPacket::Bundle(bundle) => {
-            println!("OSC Bundle: {:?}", bundle);
-        }
-    }
-}
-
-fn create_osc_listener(config: config::OSCConfig) -> Option<thread::JoinHandle<()>> {
-    if !config.listen {
-        println!("Not listening for OSC messages");
-        return None;
-    }
-
-    println!("Starting OSC listener");
-
-    let address = format!("{}:{}", config.host, config.port);
-    let osc_addr = match SocketAddrV4::from_str(&address) {
-        Ok(addr) => addr,
-        Err(_) => panic!("{}", "error with addr"),
-    };
-    let sock = UdpSocket::bind(osc_addr).unwrap();
-    println!("Listening to {}", osc_addr);
-
-    let osc_handler = thread::spawn(move || {
-        let mut buf = [0u8; rosc::decoder::MTU];
-
-        loop {
-            match sock.recv_from(&mut buf) {
-                Ok((size, addr)) => {
-                    println!("Received packet with size {} from: {}", size, addr);
-                    let (_, packet) = rosc::decoder::decode_udp(&buf[..size]).unwrap();
-                    handle_packet(packet);
-                }
-                Err(e) => {
-                    println!("Error receiving from socket: {}", e);
-                    break;
-                }
-            }
-        }
-    });
-
-    Some(osc_handler)
-}
-
 fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
     let cwd = env::current_dir()?;
 
@@ -122,7 +51,7 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
 
     let mut pd = PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate)?;
 
-    let osc_coms_handler = create_osc_listener(config.osc);
+    let osc_coms_handler = osc::create_osc_listener(config.osc);
 
     let http_coms_handler = http::create_http_listener(config.http);
 
