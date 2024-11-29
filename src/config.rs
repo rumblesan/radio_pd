@@ -9,10 +9,14 @@ use toml;
 #[derive(Deserialize)]
 pub struct Config {
     pub pd: PDConfig,
+    #[serde(default)]
     pub audio: AudioConfig,
     pub shout: ShoutConfig,
+    #[serde(default)]
     pub metadata: MetadataConfig,
+    #[serde(default)]
     pub osc: OSCConfig,
+    #[serde(default)]
     pub http: HTTPConfig,
 }
 
@@ -23,10 +27,26 @@ pub struct PDConfig {
 
 #[derive(Deserialize)]
 pub struct AudioConfig {
+    #[serde(default = "audio_blocksize_default")]
+    pub blocksize: usize,
     #[serde(default = "audio_channels_default")]
     pub channels: i32,
     #[serde(default = "audio_samplerate_default")]
     pub samplerate: i32,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        AudioConfig {
+            blocksize: 1024,
+            channels: 2,
+            samplerate: 44100,
+        }
+    }
+}
+
+fn audio_blocksize_default() -> usize {
+    1024
 }
 
 fn audio_channels_default() -> i32 {
@@ -111,16 +131,26 @@ pub struct OSCConfig {
     pub port: String,
 }
 
+impl Default for OSCConfig {
+    fn default() -> Self {
+        OSCConfig {
+            listen: false,
+            host: "0.0.0.0".to_string(),
+            port: "8080".to_string(),
+        }
+    }
+}
+
 fn osc_listen_default() -> bool {
     false
 }
 
 fn osc_host_default() -> String {
-    "0.0.0.0".to_owned()
+    "0.0.0.0".to_string()
 }
 
 fn osc_port_default() -> String {
-    "8080".to_owned()
+    "8080".to_string()
 }
 
 #[derive(Deserialize)]
@@ -133,19 +163,29 @@ pub struct HTTPConfig {
     pub port: String,
 }
 
+impl Default for HTTPConfig {
+    fn default() -> Self {
+        HTTPConfig {
+            listen: false,
+            host: Default::default(),
+            port: Default::default(),
+        }
+    }
+}
+
 fn http_listen_default() -> bool {
     true
 }
 
 fn http_host_default() -> String {
-    "0.0.0.0".to_owned()
+    "0.0.0.0".to_string()
 }
 
 fn http_port_default() -> String {
-    "9001".to_owned()
+    "9001".to_string()
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct MetadataConfig {
     pub name: Option<String>,
     pub description: Option<String>,

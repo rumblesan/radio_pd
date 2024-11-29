@@ -28,6 +28,12 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
 
     let config = config::read(cwd.join(cli.config))?;
 
+    if !matches!(config.shout.format, config::ShoutFormat::Ogg) {
+        return Err(Box::new(PDRadioError(
+            "Only support OGG format for shoutcast currently".into(),
+        )));
+    }
+
     let mut pd = PdGlobal::init_and_configure(0, config.audio.channels, config.audio.samplerate)?;
 
     let osc_coms_handler = osc::create_osc_listener(config.osc);
@@ -39,12 +45,6 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
     on_print(|value| {
         println!("{value}");
     });
-
-    if !matches!(config.shout.format, config::ShoutFormat::Ogg) {
-        return Err(Box::new(PDRadioError(
-            "Only support OGG format for shoutcast currently".into(),
-        )));
-    }
 
     let mut conn_builder = shout::ShoutConnBuilder::new()
         .host(config.shout.host)
@@ -78,15 +78,14 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn error::Error>> {
 
     pd.activate_audio(true)?;
 
-    const BLOCK_SIZE: usize = 4096;
-    let mut left_samps: [f32; BLOCK_SIZE] = [0.0; BLOCK_SIZE];
-    let mut right_samps: [f32; BLOCK_SIZE] = [0.0; BLOCK_SIZE];
-    let mut pd_output: [f32; BLOCK_SIZE * 2] = [0.0; BLOCK_SIZE * 2];
+    let mut left_samps = vec![0.0; config.audio.blocksize];
+    let mut right_samps = vec![0.0; config.audio.blocksize];
+    let mut pd_output = vec![0.0; config.audio.blocksize * 2];
     loop {
         let ticks = calculate_ticks(2, pd_output.len() as i32);
         receive_messages_from_pd();
         libpd_rs::process::process_float(ticks, &[], &mut pd_output);
-        for i in 0..BLOCK_SIZE {
+        for i in 0..config.audio.blocksize {
             left_samps[i] = pd_output[i * 2];
             right_samps[i] = pd_output[(i * 2) + 1];
         }
