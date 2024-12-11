@@ -1,0 +1,31 @@
+name: Release
+
+"on":
+  push:
+    tags:
+      - v*
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install library dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libshout-dev
+      - name: Compile and release
+        run: cargo build --release
+      - name: Build release tar
+        run: |
+          mkdir release
+          cp target/release/radio_pd release/.
+          tar -czvf release.tar.gz release
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: release.tar.gz
